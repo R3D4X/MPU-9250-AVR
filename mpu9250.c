@@ -523,9 +523,9 @@ void MPU9250SelfTest(float * destination) // Should return percent deviation fro
    
 }
 
-void MadgwickQuaternionUpdate(float ax, float ay, float az, float gx, float gy, float gz, float mx, float my, float mz)
+void MadgwickQuaternionUpdate(float ax, float ay, float az, float gx, float gy, float gz, float mx, float my, float mz, float * quaternionBuffer)
 {
-	float q1 = q[0], q2 = q[1], q3 = q[2], q4 = q[3];   // short name local variable for readability
+	float q1 = quaternionBuffer[0], q2 = quaternionBuffer[1], q3 = quaternionBuffer[2], q4 = quaternionBuffer[3];   // short name local variable for readability
 	float norm;
 	float hx, hy, _2bx, _2bz;
 	float s1, s2, s3, s4;
@@ -608,60 +608,75 @@ void MadgwickQuaternionUpdate(float ax, float ay, float az, float gx, float gy, 
 	q4 += qDot4 * deltat;
 	norm = sqrt(q1 * q1 + q2 * q2 + q3 * q3 + q4 * q4);    // normalise quaternion
 	norm = 1.0f/norm;
-	q[0] = q1 * norm;
-	q[1] = q2 * norm;
-	q[2] = q3 * norm;
-	q[3] = q4 * norm;
+	quaternionBuffer[0] = q1 * norm;
+	quaternionBuffer[1] = q2 * norm;
+	quaternionBuffer[2] = q3 * norm;
+	quaternionBuffer[3] = q4 * norm;
 
 }
 
-/*---------------------------------- Lokale Funktionen -----------------------------------------*/
+/*++++++++++++++++++++++++++++++++++++++++++++ Write to Device ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 
 // Wire.h read and write protocols
 void writeByte(uint8_t address, uint8_t subAddress, uint8_t data)
 {
-	Wire.beginTransmission(address);  // Initialize the Tx buffer
-	Wire.write(subAddress);           // Put slave register address in Tx buffer
-	Wire.write(data);                 // Put data in Tx buffer
-	Wire.endTransmission();           // Send the Tx buffer
+	//Wire.beginTransmission(address);  // Initialize the Tx buffer
+	i2c_start_wait(address+I2C_WRITE);
+	//Wire.write(subAddress);           // Put slave register address in Tx buffer
+	i2c_write(subAddress);
+	//Wire.write(data);                 // Put data in Tx buffer
+	i2c_write(data);
+	//Wire.endTransmission();           // Send the Tx buffer
+	i2c_stop();	//Free the bus for other operations
 }
+
+/*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+
+
+/*+++++++++++++++++++++++++++++++++++++++++ READ from Device ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 
 uint8_t readByte(uint8_t address, uint8_t subAddress)
 {
-	uint8_t data; // `data` will store the register data	 
-	Wire.beginTransmission(address);         // Initialize the Tx buffer
-	Wire.write(subAddress);	                 // Put slave register address in Tx buffer
-	Wire.endTransmission(false);             // Send the Tx buffer, but send a restart to keep connection alive
-	Wire.requestFrom(address, (uint8_t) 1);  // Read one byte from slave register address 
-	data = Wire.read();                      // Fill Rx buffer with result
-	return data;                             // Return data read from slave register
+	uint8_t ui8_data; // `data` will store the register data
+ 	
+	//Wire.beginTransmission(address);         // Initialize the Tx buffer
+	i2c_start_wait(address+I2C_WRITE);
+	//Wire.write(subAddress);	                 // Put slave register address in Tx buffer
+	i2c_write(subAddress);
+	//Wire.endTransmission(false);             // Send the Tx buffer, but send a restart to keep connection alive
+	i2c_rep_start(address + I2C_READ);
+	//Wire.requestFrom(address, (uint8_t) 1);  // Read one byte from slave register address 
+	//data = Wire.read();                      // Fill Rx buffer with result
+	ui8_data = i2c_readNak();			//Read one byte with a stop condition afterwards
+	i2c_stop();	//Free the bus for other operations
+
+	return ui8_data;                             // Return data read from slave register
 }
 
-void readBytes(uint8_t address, uint8_t subAddress, uint8_t count, uint8_t * dest)
+void readBytes(uint8_t address, uint8_t subAddress, uint8_t byteCount, uint8_t * destinationBuffer)
 {
-
-       	i2c_start_wait(Dev24C02+I2C_WRITE);      // set device address and write mode
-        i2c_write(0x3b);                         // write address = 0
-        i2c_rep_start(Dev24C02+I2C_READ);        // set device address and read mode
-        ret0 = i2c_readAck();                       // read one byte form address 0
-        ret1 = i2c_readAck();                       //  "    "    "    "     "    1
-        ret2 = i2c_readAck();                       //  "    "    "    "     "    2
-        ret3 = i2c_readNak();                       //  "    "    "    "     "    3
-        i2c_stop();                              // set stop condition = release bus
-  
-
+	uint8_t * p_ui8_currentAddress = dest;
 
 	//Wire.beginTransmission(address);   // Initialize the Tx buffer
-	i2c_start_wait(address);
+	i2c_start_wait(address+I2C_WRITE);
 	//Wire.write(subAddress);            // Put slave register address in Tx buffer
 	i2c_write(subAddress);
 	//Wire.endTransmission(false);       // Send the Tx buffer, but send a restart to keep connection alive
-	i2c_rep_start(address + subAddress);									"<<<<<<<<<<<<<<<<<<<<----------------------------------"
-	uint8_t i = 0;
-        Wire.requestFrom(address, count);  // Read bytes from slave register address 
-	while (Wire.available()) {
-        dest[i++] = Wire.read(); }         // Put read results in the Rx buffer
+	i2c_rep_start(address + I2C_READ);
+	for(uint8_t i_cnt = 0 ; i_cnt < (byteCount - 1) , i_cnt++)	//Read (byteCount - 1)-times without stop condition
+	{
+		destinationBuffer[i_cnt] = i2c_readAck();
+	}
+	destinationBuffer[byteCount] = i2c_readNak();			//Read the last byte with a stop condition afterwards
+        //Wire.requestFrom(address, count);  // Read bytes from slave register address 
+	//while (Wire.available()) {
+        //dest[i++] = Wire.read(); }         // Put read results in the Rx buffer
+
+	i2c_stop();	//Free the bus for other operations
 }
+
+/*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+
 
 void magcalMPU9250(float * dest1, float * dest2) 
  {

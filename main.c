@@ -4,6 +4,7 @@
 #include "i2cmaster.h"
 #include "mpu9250.h"
 #include "uart.h"
+#include "millis.h"
 
 int16_t accelCount[3];  // Stores the 16-bit signed accelerometer sensor output
 int16_t gyroCount[3];   // Stores the 16-bit signed gyro sensor output
@@ -14,14 +15,14 @@ float q[4] = {1.0f, 0.0f, 0.0f, 0.0f};    // vector to hold quaternion
 float eInt[3] = {0.0f, 0.0f, 0.0f};       // vector to hold integral error for Mahony method
 
 uint32_t lastUpdate = 0; // used to calculate integration interval
-uint32_t Now = 0;        // used to calculate integration interval
+unsigned long Now = 0;        // used to calculate integration interval
 float deltat = 0.0f, sum = 0.0f;        // integration interval for both filter schemes
 float pitch, yaw, roll;
 uint32_t delt_t = 0; // used to control display output rate
 uint32_t count = 0, sumCount = 0; // used to control display output rate
 
 //void setup()
-void main()
+int main(void)
 {
 	//Wire.begin();
     	i2c_init();                                // init I2C interface
@@ -65,7 +66,7 @@ void main()
     			mz = (float)magCount[2]*mRes*magCalibration[2] - magBias[2];   
   		}
   
-  		Now = micros();
+  		Now = micros_get();
   		deltat = ((Now - lastUpdate)/1000000.0f); // set integration time by time elapsed since last filter update
   		lastUpdate = Now;
 
@@ -79,7 +80,7 @@ void main()
   		// in the LSM9DS0 sensor. This rotation can be modified to allow any convenient orientation convention.
   		// This is ok by aircraft orientation standards!  
   		// Pass gyro rate as rad/s
-  		MadgwickQuaternionUpdate(ax, ay, az, gx*PI/180.0f, gy*PI/180.0f, gz*PI/180.0f,  my,  mx, mz);
+  		MadgwickQuaternionUpdate(ax, ay, az, gx*PI/180.0f, gy*PI/180.0f, gz*PI/180.0f,  my,  mx, mz , q);
 //  		MahonyQuaternionUpdate(ax, ay, az, gx*PI/180.0f, gy*PI/180.0f, gz*PI/180.0f, my, mx, mz);
 
 
@@ -180,4 +181,5 @@ void main()
 			}
 		}
 	}
+	return -1;
 }
