@@ -117,8 +117,6 @@
 	#error "Bad MILLIS_TIMER set"
 #endif
 
-static volatile millis_t milliseconds;
-
 // Initialise library
 void millis_init()
 {
@@ -143,7 +141,7 @@ millis_t millis_get()
 // Get current microseconds
 micros_t micros_get(void)
 {
-	millis_t us = millis_get() * 1000 + TCNTA * 4.0;
+	millis_t us = (millis_get() * 1000) + (TCNTA * 4.0);
 
 	return us;
 }

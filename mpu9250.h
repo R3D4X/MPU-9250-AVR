@@ -30,11 +30,16 @@
 #ifndef avb_mpu9250
 #define avb_mpu9250
 
+#include <avr/io.h>
+#include <util/delay.h>
+
 #include <stdint.h>
 #include <stdbool.h>
 #include <math.h>
 
 #include "mpu9250_registers.h"
+#include "uart.h"
+#include "i2cmaster.h"
 
 // Using NOKIA 5110 monochrome 84 x 48 pixel display
 // pin 9 - Serial clock out (SCLK)
@@ -130,5 +135,5 @@ void readGyroData(int16_t * destination);
 void initMPU9250(void);
 void MPU9250SelfTest(float * destination);
 void calibrateMPU9250(float * dest1, float * dest2);
-void MadgwickQuaternionUpdate(float ax, float ay, float az, float gx, float gy, float gz, float mx, float my, float mz)
+void MadgwickQuaternionUpdate(float ax, float ay, float az, float gx, float gy, float gz, float mx, float my, float mz, float * quaternionBuffer);
 /*----------------------------------------------------------------------------------------------*/

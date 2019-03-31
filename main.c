@@ -6,6 +6,9 @@
 #include "uart.h"
 #include "millis.h"
 
+#ifndef main_declarations
+#define main_declarations
+
 int16_t accelCount[3];  // Stores the 16-bit signed accelerometer sensor output
 int16_t gyroCount[3];   // Stores the 16-bit signed gyro sensor output
 int16_t magCount[3];    // Stores the 16-bit signed magnetometer sensor output
@@ -14,12 +17,14 @@ float ax, ay, az, gx, gy, gz, mx, my, mz; // variables to hold latest sensor dat
 float q[4] = {1.0f, 0.0f, 0.0f, 0.0f};    // vector to hold quaternion
 float eInt[3] = {0.0f, 0.0f, 0.0f};       // vector to hold integral error for Mahony method
 
-uint32_t lastUpdate = 0; // used to calculate integration interval
-unsigned long Now = 0;        // used to calculate integration interval
-float deltat = 0.0f, sum = 0.0f;        // integration interval for both filter schemes
-float pitch, yaw, roll;
+uint32_t lastUpdate = 0;	// used to calculate integration interval
+unsigned long Now = 0;	// used to calculate integration interval
+float deltat = 0, sum = 0;        // integration interval for both filter schemes
+float pitch = 0, yaw = 0, roll = 0;
 uint32_t delt_t = 0; // used to control display output rate
 uint32_t count = 0, sumCount = 0; // used to control display output rate
+
+#endif
 
 //void setup()
 int main(void)
@@ -80,8 +85,8 @@ int main(void)
   		// in the LSM9DS0 sensor. This rotation can be modified to allow any convenient orientation convention.
   		// This is ok by aircraft orientation standards!  
   		// Pass gyro rate as rad/s
-  		MadgwickQuaternionUpdate(ax, ay, az, gx*PI/180.0f, gy*PI/180.0f, gz*PI/180.0f,  my,  mx, mz , q);
-//  		MahonyQuaternionUpdate(ax, ay, az, gx*PI/180.0f, gy*PI/180.0f, gz*PI/180.0f, my, mx, mz);
+  		MadgwickQuaternionUpdate(ax, ay, az, gx*M_PI/180.0f, gy*M_PI/180.0f, gz*M_PI/180.0f,  my,  mx, mz , q);
+//  		MahonyQuaternionUpdate(ax, ay, az, gx*M_PI/180.0f, gy*M_PI/180.0f, gz*M_PI/180.0f, my, mx, mz);
 
 
     		if (!AHRS) 
@@ -113,7 +118,8 @@ int main(void)
     				}
     
     				count = millis();
-    				digitalWrite(myLed, !digitalRead(myLed));  // toggle led
+  				PORTB ^= (1 << 5);
+    				//digitalWrite(myLed, !digitalRead(myLed));  // toggle led
     			}
     		}
     		else 
@@ -154,10 +160,10 @@ int main(void)
   	  			yaw   = atan2(2.0f * (q[1] * q[2] + q[0] * q[3]), q[0] * q[0] + q[1] * q[1] - q[2] * q[2] - q[3] * q[3]);   
   	  			pitch = -asin(2.0f * (q[1] * q[3] - q[0] * q[2]));
   	  			roll  = atan2(2.0f * (q[0] * q[1] + q[2] * q[3]), q[0] * q[0] - q[1] * q[1] - q[2] * q[2] + q[3] * q[3]);
-  	  			pitch *= 180.0f / PI;
-  	  			yaw   *= 180.0f / PI; 
+  	  			pitch *= 180.0f / M_PI;
+  	  			yaw   *= 180.0f / M_PI; 
     				yaw   -= 2.45; /* 2019-03-30	2° 45' E  changing by  0.083° E per year (+ve for west )*/
-    				roll  *= 180.0f / PI;
+    				roll  *= 180.0f / M_PI;
      
 
     				UART_Printf("Yaw, Pitch, Roll: %d , %d , %d\n" , yaw+180, pitch, roll);

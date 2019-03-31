@@ -42,7 +42,7 @@ Errors and omissions should be reported to codelibraries@exploreembedded.com
 #define _UART_H
 
 #include <avr/io.h>
-//#include "stdutils.h"
+#include "stdutils.h"
 
 /***************************************************************************************************
                              Baudrate configurations
