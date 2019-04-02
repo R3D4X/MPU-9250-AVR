@@ -62,42 +62,6 @@
 #define AHRS true         // set to false for basic data read
 #define SerialDebug true   // set to true to get Serial output for debugging
 
-// Set initial input parameters
-enum Ascale {
-  AFS_2G = 0,
-  AFS_4G,
-  AFS_8G,
-  AFS_16G
-};
-
-enum Gscale {
-  GFS_250DPS = 0,
-  GFS_500DPS,
-  GFS_1000DPS,
-  GFS_2000DPS
-};
-
-enum Mscale {
-  MFS_14BITS = 0, // 0.6 mG per LSB
-  MFS_16BITS      // 0.15 mG per LSB
-};
-
-// Specify sensor full scale
-uint8_t Gscale = GFS_250DPS;
-uint8_t Ascale = AFS_2G;
-uint8_t Mscale = MFS_16BITS; // Choose either 14-bit or 16-bit magnetometer resolution
-uint8_t Mmode = 0x02;        // 2 for 8 Hz, 6 for 100 Hz continuous magnetometer data read
-float aRes, gRes, mRes;      // scale resolutions per LSB for the sensors
-
-float   temperature;    // Stores the real internal chip temperature in degrees Celsius
-float   SelfTest[6];    // holds results of gyro and accelerometer self test
-
-float magBias[3],magScale[3];
-
-float magCalibration[3] = {0, 0, 0}, magbias[3] = {0, 0, 0};  // Factory mag calibration and mag bias
-float gyroBias[3] = {0, 0, 0}, accelBias[3] = {0, 0, 0};      // Bias corrections for gyro and accelerometer
-int16_t tempCount;      // temperature raw count output
-
 // global constants for 9 DoF fusion and AHRS (Attitude and Heading Reference System)
 #define GyroMeasError  M_PI * (40.0f / 180.0f);   // gyroscope measurement error in rads/s (start at 40 deg/s)
 #define GyroMeasDrift  M_PI * (0.0f  / 180.0f);   // gyroscope measurement drift in rad/s/s (start at 0.0 deg/s/s)
@@ -109,12 +73,32 @@ int16_t tempCount;      // temperature raw count output
 // I haven't noticed any reduction in solution accuracy. This is essentially the I coefficient in a PID control sense; 
 // the bigger the feedback coefficient, the faster the solution converges, usually at the expense of accuracy. 
 // In any case, this is the free parameter in the Madgwick filtering and fusion scheme.
-#define beta sqrt(3.0f / 4.0f) * GyroMeasError;   // compute beta
-#define zeta sqrt(3.0f / 4.0f) * GyroMeasDrift;   // compute zeta, the other free parameter in the Madgwick scheme usually set to a small or zero value
-#define Kp 2.0f * 5.0f // these are the free parameters in the Mahony filter and fusion scheme, Kp for proportional feedback, Ki for integral
+#define Kp 10.0f // these are the free parameters in the Mahony filter and fusion scheme, Kp for proportional feedback, Ki for integral
 #define Ki 0.0f
 
-#endif
+// Specify sensor full scale
+extern uint8_t Gscale;	// = GFS_250DPS;
+extern uint8_t Ascale;	// = AFS_2G;
+extern uint8_t Mscale;  // = MFS_16BITS; // Choose either 14-bit or 16-bit magnetometer resolution
+extern uint8_t Mmode;	     // = 0x02;        // 2 for 8 Hz, 6 for 100 Hz continuous magnetometer data read
+float aRes, gRes, mRes;      // scale resolutions per LSB for the sensors
+
+float   temperature;    // Stores the real internal chip temperature in degrees Celsius
+float   SelfTest[6];    // holds results of gyro and accelerometer self test
+
+extern float magBias[3];
+extern float magScale[3];
+
+extern float magCalibration[3];		// = {0, 0, 0}, magbias[3] = {0, 0, 0};  // Factory mag calibration and mag bias
+extern float gyroBias[3];		// = {0, 0, 0};
+extern float accelBias[3];		// = {0, 0, 0};      // Bias corrections for gyro and accelerometer
+int16_t tempCount;      // temperature raw count output
+
+extern float deltat;	// = 0;
+extern float sum; 	//= 0;        // integration interval for both filter schemes
+
+extern float beta;		//= 0.8660254 * GyroMeasError; //sqrt(3.0f / 4.0f) * GyroMeasError;   // compute beta
+extern float zeta;		// = 0.8660254 * GyroMeasDrift; //sqrt(3.0f / 4.0f) * GyroMeasDrift;   // compute zeta, the other free parameter in the Madgwick scheme usually set to a small or zero value
 
 void mpu9250_setup(void);
 
@@ -137,3 +121,6 @@ void MPU9250SelfTest(float * destination);
 void calibrateMPU9250(float * dest1, float * dest2);
 void MadgwickQuaternionUpdate(float ax, float ay, float az, float gx, float gy, float gz, float mx, float my, float mz, float * quaternionBuffer);
 /*----------------------------------------------------------------------------------------------*/
+
+
+#endif

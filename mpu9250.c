@@ -1,5 +1,44 @@
 #include "mpu9250.h"
 
+// Set initial input parameters
+enum Ascale_values {
+  AFS_2G = 0,
+  AFS_4G,
+  AFS_8G,
+  AFS_16G
+};
+
+enum Gscale_values {
+  GFS_250DPS = 0,
+  GFS_500DPS,
+  GFS_1000DPS,
+  GFS_2000DPS
+};
+
+enum Mscale_values {
+  MFS_14BITS = 0, // 0.6 mG per LSB
+  MFS_16BITS      // 0.15 mG per LSB
+};
+
+uint8_t Gscale = GFS_250DPS;
+uint8_t Ascale = AFS_2G;
+
+uint8_t Mscale = MFS_16BITS; // Choose either 14-bit or 16-bit magnetometer resolution
+
+float beta = 0.8660254 * GyroMeasError; //sqrt(3.0f / 4.0f) * GyroMeasError;   // compute beta
+float zeta = 0.8660254 * GyroMeasDrift; //sqrt(3.0f / 4.0f) * GyroMeasDrift;   // compute zeta, the other free parameter in the Madgwick scheme usually set to a small or zero value
+
+uint8_t Mmode = 0x02;        // 2 for 8 Hz, 6 for 100 Hz continuous magnetometer data read
+
+float deltat = 0, sum = 0;        // integration interval for both filter schemes
+
+float gyroBias[3] = {0, 0, 0}, accelBias[3] = {0, 0, 0};      // Bias corrections for gyro and accelerometer
+
+float magCalibration[3] = {0, 0, 0}, magbias[3] = {0, 0, 0};  // Factory mag calibration and mag bias
+
+float magBias[3] = {0 ,0 ,0}, magScale[3] = {0, 0, 0};
+
+
 void mpu9250_setup()
 {
 	//  TWBR = 12;  // 400 kbit/sec I2C speed
@@ -654,15 +693,13 @@ uint8_t readByte(uint8_t address, uint8_t subAddress)
 
 void readBytes(uint8_t address, uint8_t subAddress, uint8_t byteCount, uint8_t * destinationBuffer)
 {
-	uint8_t * p_ui8_currentAddress = dest;
-
 	//Wire.beginTransmission(address);   // Initialize the Tx buffer
 	i2c_start_wait(address+I2C_WRITE);
 	//Wire.write(subAddress);            // Put slave register address in Tx buffer
 	i2c_write(subAddress);
 	//Wire.endTransmission(false);       // Send the Tx buffer, but send a restart to keep connection alive
 	i2c_rep_start(address + I2C_READ);
-	for(uint8_t i_cnt = 0 , i_cnt < (byteCount - 1) , i_cnt++)	//Read (byteCount - 1)-times without stop condition
+	for(uint8_t i_cnt = 0 ; i_cnt < (byteCount - 1) ; i_cnt++)	//Read (byteCount - 1)-times without stop condition
 	{
 		destinationBuffer[i_cnt] = i2c_readAck();
 	}

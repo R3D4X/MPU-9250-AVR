@@ -17,8 +17,10 @@
 * unsigned long			- 49.71 days			- 4 bytes \n
 * unsigned long long	- 584.9 million years	- 8 bytes
 */
-//typedef unsigned long unsigned long;
-//typedef unsigned long micros_t;
+typedef unsigned long millis_t;
+typedef unsigned long micros_t;
+
+extern millis_t milliseconds;		// = 0;
 
 #define MILLIS_TIMER0 0 /**< Use timer0. */
 #define MILLIS_TIMER1 1 /**< Use timer1. */

@@ -117,6 +117,8 @@
 	#error "Bad MILLIS_TIMER set"
 #endif
 
+millis_t milliseconds = 0;
+
 // Initialise library
 void millis_init()
 {
@@ -141,7 +143,7 @@ millis_t millis_get()
 // Get current microseconds
 micros_t micros_get(void)
 {
-	millis_t us = (millis_get() * 1000) + (TCNTA * 4.0);
+	millis_t us = (millis_get() * 1000) + (TCNT0 * 4.0);	//The step of an avt seems to be 4 microseconds, so we multiply the milliseconds by thousand and add the current timercount multiplied by four
 
 	return us;
 }

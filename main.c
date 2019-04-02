@@ -19,7 +19,6 @@ float eInt[3] = {0.0f, 0.0f, 0.0f};       // vector to hold integral error for M
 
 uint32_t lastUpdate = 0;	// used to calculate integration interval
 unsigned long Now = 0;	// used to calculate integration interval
-float deltat = 0, sum = 0;        // integration interval for both filter schemes
 float pitch = 0, yaw = 0, roll = 0;
 uint32_t delt_t = 0; // used to control display output rate
 uint32_t count = 0, sumCount = 0; // used to control display output rate
