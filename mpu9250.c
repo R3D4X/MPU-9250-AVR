@@ -1,5 +1,8 @@
 #include "mpu9250.h"
 
+//#define byteWrite_DEBUG 1
+//#define byteWrite_Errors 1
+
 // Set initial input parameters
 enum Ascale_values {
   AFS_2G = 0,
@@ -54,18 +57,18 @@ void mpu9250_setup()
 	//digitalWrite(myLed, HIGH);
   	PORTB |= (1 << 5);
   
-  	UART_Printf("MPU9250\n");
-  	UART_Printf("9-DOF 16-bit\n");
-  	UART_Printf("motion sensor\n");
-  	UART_Printf("60 ug LSB\n");
+  	UART_Printf("MPU9250\n\r");
+  	UART_Printf("9-DOF 16-bit\n\r");
+  	UART_Printf("motion sensor\n\r");
+  	UART_Printf("60 ug LSB\n\r");
   	_delay_ms(800);
 
   	// Read the WHO_AM_I register, this is a good test of communication
   	//readBytes(MPU9250_ADDRESS, ACCEL_XOUT_H, 6, &rawData[0]);  // Read the six raw data registers into data array
   	uint8_t whoami = 0;
 
-  readBytes(MPU9250_ADDRESS, WHO_AM_I_MPU9250 , 1 , &whoami);  // Read WHO_AM_I register for MPU-9250
-  UART_Printf("MPU9250\n I AM %x I should be 0x71\n" , whoami);
+  	whoami = readByte(MPU9250_ADDRESS, WHO_AM_I_MPU9250);  // Read WHO_AM_I register for MPU-9250
+  	UART_Printf("MPU9250\n\r I AM %x I should be 0x71\n\r" , whoami);
 ////  display.setCursor(20,0);
 //  UART_Printf("MPU9250");
 ////  display.setCursor(0,10);
@@ -81,60 +84,92 @@ void mpu9250_setup()
 
   if (whoami == 0x71) // WHO_AM_I should always be 0x68
   {  
-    UART_Printf("MPU9250 is online...");
+    UART_Printf("MPU9250 is online...\n\r");
     
     MPU9250SelfTest(SelfTest); // Start by performing self test and reporting values
-    UART_Printf("x-axis self test: acceleration trim within : %d\% of factory value\n" 	, SelfTest[0]);
-    UART_Printf("y-axis self test: acceleration trim within : %d\% of factory value\n" 	, SelfTest[1]);
-    UART_Printf("z-axis self test: acceleration trim within : %d\% of factory value\n" 	, SelfTest[2]);
-    UART_Printf("x-axis self test: gyration trim within : %d\% of factory value\n" 	, SelfTest[3]); 
-    UART_Printf("y-axis self test: gyration trim within : %d\% of factory value\n"	, SelfTest[4]);
-    UART_Printf("z-axis self test: gyration trim within : %d\% of factory value\n"	, SelfTest[5]);
+    UART_Printf("x-axis self test: acceleration trim within : %d\% of factory value\n\r" 	, SelfTest[0]);
+    UART_Printf("y-axis self test: acceleration trim within : %d\% of factory value\n\r" 	, SelfTest[1]);
+    UART_Printf("z-axis self test: acceleration trim within : %d\% of factory value\n\r" 	, SelfTest[2]);
+    UART_Printf("x-axis self test: gyration trim within : %d\% of factory value\n\r" 	, SelfTest[3]); 
+    UART_Printf("y-axis self test: gyration trim within : %d\% of factory value\n\r"	, SelfTest[4]);
+    UART_Printf("z-axis self test: gyration trim within : %d\% of factory value\n\r"	, SelfTest[5]);
  
     calibrateMPU9250(gyroBias, accelBias); // Calibrate gyro and accelerometers, load biases in bias registers
 
-    UART_Printf("MPU9250 bias");
+    UART_Printf("MPU9250 bias\n\r");
 
-    UART_Printf(" x   y   z  ");
+    UART_Printf(" x   y   z\n\r");
 
 
-    UART_Printf("%d %d %d mg\n" , (int)(1000*accelBias[0]) , (int)(1000*accelBias[1]) , (int)(1000*accelBias[2])); 
+    UART_Printf("%d %d %d mg\n\r" , (int)(1000*accelBias[0]) , (int)(1000*accelBias[1]) , (int)(1000*accelBias[2])); 
 
-    UART_Printf("%d %d %d °/s\n" , gyroBias[0] , gyroBias[1] , gyroBias[2]); 
+    UART_Printf("%d %d %d °/s\n\r" , gyroBias[0] , gyroBias[1] , gyroBias[2]); 
     _delay_ms(1000); 
   
     initMPU9250(); 
-    UART_Printf("MPU9250 initialized for active data mode...."); // Initialize device for active mode read of acclerometer, gyroscope, and temperature
-  
-    // Read the WHO_AM_I register of the magnetometer, this is a good test of communication
-    uint8_t d = readByte(AK8963_ADDRESS, WHO_AM_I_AK8963);  // Read WHO_AM_I register for AK8963
-    UART_Printf("AK8963\nI AM %x I should be 0x48" , d);
+    UART_Printf("MPU9250 initialized for active data mode....\n\r"); // Initialize device for active mode read of acclerometer, gyroscope, and temperature
 
-    _delay_ms(1000); 
-  
-    // Get magnetometer calibration from AK8963 ROM
-    initAK8963(magCalibration); UART_Printf("AK8963 initialized for active data mode...."); // Initialize device for active mode read of magnetometer
-    getMres();
-    magcalMPU9250(magBias,magScale); 
 
+    uint8_t BypassTrue = 0;
+
+    while(BypassTrue == 0)
+    {
+    	writeByte(MPU9250_ADDRESS, INT_PIN_CFG, 0x22);    
+    	writeByte(MPU9250_ADDRESS, INT_ENABLE, 0x01);  // Enable data ready (bit 0) interrupt
+    	uint8_t PinCFG = readByte(MPU9250_ADDRESS, INT_PIN_CFG);	//0x22);
+    	uint8_t MasterDis = readByte(MPU9250_ADDRESS, I2C_MST_CTRL); //0x00); // Disable I2C master
+    	uint8_t IntEna = readByte(MPU9250_ADDRESS, INT_ENABLE); //0x01); // Disable I2C master
+	whoami = 0;
+  	whoami = readByte(MPU9250_ADDRESS, WHO_AM_I_MPU9250);  // Read WHO_AM_I register for MPU-9250
+    	UART_Printf("PinCFG: %x = 0x22 MasterDisable %x = 0x00 Interrupts %x = 0x01 Whoami %x = 0x71\n\r" , PinCFG, MasterDis, IntEna, whoami);
+	if(PinCFG == 0x22 && MasterDis == 0x00 && IntEna == 0x01)
+	{
+		BypassTrue = 1;
+	}
+	_delay_ms(800); 
+    }
+
+	// Read the WHO_AM_I register of the magnetometer, this is a good test of communication
+    	whoami = readByte_Debug(AK8963_ADDRESS, WHO_AM_I_AK8963);  // Read WHO_AM_I register for AK8963
+   	UART_Printf("AK8963\n\rI AM %x I should be 0x48\n\r" , whoami);
+
+    if(whoami == 0x48)
+    {
+
+    	_delay_ms(1000); 
   
+    	// Get magnetometer calibration from AK8963 ROM
+    	initAK8963(magCalibration); 
+	UART_Printf("AK8963 initialized for active data mode....\n\r"); // Initialize device for active mode read of magnetometer
+    	getMres();
+    	magcalMPU9250(magBias,magScale); 
+
 #ifdef SerialDebug
-    UART_Printf("Calibration values:\n");
-    UART_Printf("X-Axis sensitivity adjustment value %d\n" , magCalibration[0]);
-    UART_Printf("Y-Axis sensitivity adjustment value %d\n" , magCalibration[1]);
-    UART_Printf("Z-Axis sensitivity adjustment value %d\n" , magCalibration[2]);
+    	UART_Printf("Calibration values:\n\r");
+    	UART_Printf("X-Axis sensitivity adjustment value %d\n\r" , magCalibration[0]);
+    	UART_Printf("Y-Axis sensitivity adjustment value %d\n\r" , magCalibration[1]);
+    	UART_Printf("Z-Axis sensitivity adjustment value %d\n\r" , magCalibration[2]);
 #endif
   
-    UART_Printf("ASAX %d\n" , magCalibration[0]);
-    UART_Printf("ASAY %d\n" , magCalibration[1]);
-    UART_Printf("ASAZ %d\n" , magCalibration[2]);
-    _delay_ms(1000);  
+    	UART_Printf("ASAX %d\n" , magCalibration[0]);
+    	UART_Printf("ASAY %d\n" , magCalibration[1]);
+    	UART_Printf("ASAZ %d\n" , magCalibration[2]);
+    	_delay_ms(1000);  
+    }
+    else
+    {
+    	UART_Printf("Could not connect to AK8963: 0x%x\n\r" , whoami);
+    }
+
+    whoami = readByte(MPU9250_ADDRESS, WHO_AM_I_MPU9250);  // Read WHO_AM_I register for MPU-9250
+    UART_Printf("MPU9250\n\r I AM %x I should be 0x71\n\r" , whoami);
+
   }
   else
   {
-    UART_Printf("Could not connect to MPU9250: 0x");
-    UART_Printf("%x" , whoami);
+    UART_Printf("Could not connect to MPU9250: 0x%x\n\r" , whoami);
   }
+  UART_Printf("Init done!\n\r");
 }
 
 //===================================================================================================================
@@ -221,16 +256,26 @@ void readGyroData(int16_t * destination)
 
 void readMagData(int16_t * destination)
 {
-  uint8_t rawData[7];  // x/y/z gyro register data, ST2 register stored here, must read ST2 at end of data acquisition
-  if(readByte(AK8963_ADDRESS, AK8963_ST1) & 0x01) { // wait for magnetometer data ready bit to be set
-  readBytes(AK8963_ADDRESS, AK8963_XOUT_L, 7, &rawData[0]);  // Read the six raw data and ST2 registers sequentially into data array
-  uint8_t c = rawData[6]; // End data read by reading ST2 register
-    if(!(c & 0x08)) { // Check if magnetic sensor overflow set, if not then report data
-    destination[0] = ((int16_t)rawData[1] << 8) | rawData[0] ;  // Turn the MSB and LSB into a signed 16-bit value
-    destination[1] = ((int16_t)rawData[3] << 8) | rawData[2] ;  // Data stored as little Endian
-    destination[2] = ((int16_t)rawData[5] << 8) | rawData[4] ; 
-   }
-  }
+  	uint8_t rawData[7];  // x/y/z gyro register data, ST2 register stored here, must read ST2 at end of data acquisition
+	//if(readByte(AK8963_ADDRESS, AK8963_ST1) & 0x01) 
+	while(!(readByte(AK8963_ADDRESS, AK8963_ST1) & 0x01))
+	{
+#ifdef byteWrite_DEBUG 
+  		UART_Printf("End of readBytes()\n\r");
+#endif
+	}
+ 
+	//{ // wait for magnetometer data ready bit to be set
+		readBytes(AK8963_ADDRESS, AK8963_XOUT_L, 7, &rawData[0]);  // Read the six raw data and ST2 registers sequentially into data array
+ 
+  		uint8_t c = rawData[6]; // End data read by reading ST2 register
+    		if(!(c & 0x08)) 
+		{ // Check if magnetic sensor overflow set, if not then report data
+    			destination[0] = ((int16_t)rawData[1] << 8) | rawData[0] ;  // Turn the MSB and LSB into a signed 16-bit value
+    			destination[1] = ((int16_t)rawData[3] << 8) | rawData[2] ;  // Data stored as little Endian
+    			destination[2] = ((int16_t)rawData[5] << 8) | rawData[4] ; 
+   		}
+  	//}
 }
 
 int16_t readTempData()
@@ -658,14 +703,47 @@ void MadgwickQuaternionUpdate(float ax, float ay, float az, float gx, float gy, 
 // Wire.h read and write protocols
 void writeByte(uint8_t address, uint8_t subAddress, uint8_t data)
 {
+	uint8_t pui8_sendbuffer[2];
+	pui8_sendbuffer[0] = subAddress;
+	pui8_sendbuffer[1] = data;
+#ifdef byteWrite_Errors							 //send a stop-condition	
+ 	uint8_t ui8_return = 0;
+#endif
 	//Wire.beginTransmission(address);  // Initialize the Tx buffer
-	i2c_start_wait(address+I2C_WRITE);
+#ifdef byteWrite_DEBUG 
+  	UART_Printf("Address is %x\n\r" , address);
+#endif
+	//i2c_start(address+I2C_WRITE);
 	//Wire.write(subAddress);           // Put slave register address in Tx buffer
-	i2c_write(subAddress);
+#ifdef byteWrite_DEBUG 
+  	UART_Printf("SubAddress to send is %x\n\r" , subAddress);
+#endif
+
+#ifdef byteWrite_DEBUG 
+  	UART_Printf("Data to send is %x\n\r" , data);
+#endif
+
+#ifdef byteWrite_Errors
+	ui8_return = 
+#endif
+		twi_writeTo(address , pui8_sendbuffer , 2 , 1 ,(uint8_t) true); // Send to address content of *subAddress 
+									 	//with length 1 , wait for end of transmit and 
+									 	//send a stop-condition		
+	//i2c_write(subAddress);
 	//Wire.write(data);                 // Put data in Tx buffer
-	i2c_write(data);
+
+	//i2c_write(data);
 	//Wire.endTransmission();           // Send the Tx buffer
-	i2c_stop();	//Free the bus for other operations
+/*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+
+#ifdef byteWrite_Errors							 //send a stop-condition	
+	if(ui8_return != 0)
+	{
+		UART_Printf("Whoopsie got the following error code during write process: %x\n\r" , ui8_return);
+	}
+#endif
+
+	//i2c_stop();	//Free the bus for other operations
 }
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
@@ -675,41 +753,147 @@ void writeByte(uint8_t address, uint8_t subAddress, uint8_t data)
 
 uint8_t readByte(uint8_t address, uint8_t subAddress)
 {
+#ifdef byteWrite_DEBUG 
+  	UART_Printf("Begin of readByte()\n\r");
+#endif
 	uint8_t ui8_data; // `data` will store the register data
- 	
-	//Wire.beginTransmission(address);         // Initialize the Tx buffer
-	i2c_start_wait(address+I2C_WRITE);
-	//Wire.write(subAddress);	                 // Put slave register address in Tx buffer
-	i2c_write(subAddress);
-	//Wire.endTransmission(false);             // Send the Tx buffer, but send a restart to keep connection alive
-	i2c_rep_start(address + I2C_READ);
-	//Wire.requestFrom(address, (uint8_t) 1);  // Read one byte from slave register address 
-	//data = Wire.read();                      // Fill Rx buffer with result
-	ui8_data = i2c_readNak();			//Read one byte with a stop condition afterwards
-	i2c_stop();	//Free the bus for other operations
+
+	readBytes(address, subAddress, 1, &ui8_data);
 
 	return ui8_data;                             // Return data read from slave register
 }
 
 void readBytes(uint8_t address, uint8_t subAddress, uint8_t byteCount, uint8_t * destinationBuffer)
 {
-	//Wire.beginTransmission(address);   // Initialize the Tx buffer
-	i2c_start_wait(address+I2C_WRITE);
-	//Wire.write(subAddress);            // Put slave register address in Tx buffer
-	i2c_write(subAddress);
-	//Wire.endTransmission(false);       // Send the Tx buffer, but send a restart to keep connection alive
-	i2c_rep_start(address + I2C_READ);
-	for(uint8_t i_cnt = 0 ; i_cnt < (byteCount - 1) ; i_cnt++)	//Read (byteCount - 1)-times without stop condition
-	{
-		destinationBuffer[i_cnt] = i2c_readAck();
-	}
-	destinationBuffer[byteCount] = i2c_readNak();			//Read the last byte with a stop condition afterwards
-        //Wire.requestFrom(address, count);  // Read bytes from slave register address 
-	//while (Wire.available()) {
-        //dest[i++] = Wire.read(); }         // Put read results in the Rx buffer
+#ifdef byteWrite_DEBUG 
+	UART_Printf("Begin of readBytes()\n\r");
+#endif
+ 	uint8_t ui8_return = 0;
 
-	i2c_stop();	//Free the bus for other operations
+	//Wire.beginTransmission(address);         // Initialize the Tx buffer
+#ifdef byteWrite_DEBUG 
+  	UART_Printf("Address is %x\n\r" , address);
+#endif
+	//i2c_start_wait(address+I2C_WRITE);
+	//Wire.write(subAddress);	                 // Put slave register address in Tx buffer
+	//ui8_return = i2c_write(subAddress);
+#ifdef byteWrite_DEBUG 
+  	UART_Printf("SubAddress to send is %x\n\r" , subAddress);
+#endif
+
+	//Wire.endTransmission(false);             // Send the Tx buffer, but send a restart to keep connection alive
+	//ui8_return = i2c_rep_start(address + I2C_READ);
+	ui8_return = twi_writeTo(address , &subAddress , 1 , 1 ,(uint8_t) false); // Send to address content of *subAddress 
+									 //with length 1 , wait for end of transmit and 
+									 //don't send a stop-condition	
+	if(ui8_return == 0)
+	{
+#ifdef byteWrite_DEBUG 
+  		UART_Printf("Send subAddress %x to address %x\n\r" , subAddress , address);
+#endif
+	}
+#ifdef byteWrite_Errors
+	else if(ui8_return == 2)
+	{	
+  		UART_Printf("Address was send received a NACK!\n\r");
+	}
+	else if(ui8_return == 3)
+	{
+  		UART_Printf("subAddress was send received a NACK!\n\r");
+	}
+	else
+	{
+		UART_Printf("ERROR! Status-Code: %x!\n\r" , ui8_return);
+	}
+#endif
+        //Wire.requestFrom(address, count);  // Read bytes from slave register address 
+	ui8_return = twi_readFrom(address, destinationBuffer, byteCount, (uint8_t)true); //Read byteCount-Bytes from 
+											 //address an put it into the
+											 //destinationBuffer then send a
+											 //stop-condition
+#ifdef byteWrite_Errors
+	if(ui8_return != byteCount)
+	{
+		UART_Printf("Whoopsie read 0x%x Bytes instead of 0x%x Byte...\n\r" , ui8_return , byteCount);
+	}
+#endif
+	//while (Wire.available()) {
+        //dest[i++] = Wire.read(); }         // Put read results in the Rx buffer <-- We don't need this because we let
+	//					TWI Write directly into the memory region because we dont use a 
+	//					system buffer
+
+	//i2c_stop();	//Free the bus for other operations <- This happens automatically at the end of twi_readFrom
+	//		  				       because of the "true" as last parameter
+#ifdef byteWrite_DEBUG 
+  	UART_Printf("End of readBytes()\n\r");
+#endif
 }
+
+/*---------------------------------- Debug --------------------------------------------------------------------------------*/
+
+uint8_t readByte_Debug(uint8_t address, uint8_t subAddress)
+{
+  	UART_Printf("Begin of readByte()\n\r");
+	uint8_t ui8_data; // `data` will store the register data
+
+	readBytes_Debug(address, subAddress, 1, &ui8_data);
+
+	return ui8_data;                             // Return data read from slave register
+}
+
+void readBytes_Debug(uint8_t address, uint8_t subAddress, uint8_t byteCount, uint8_t * destinationBuffer)
+{
+	UART_Printf("Begin of readBytes()\n\r");
+ 	uint8_t ui8_return = 0;
+
+	//Wire.beginTransmission(address);         // Initialize the Tx buffer
+  	UART_Printf("Address is %x\n\r" , address);
+	//i2c_start_wait(address+I2C_WRITE);
+	//Wire.write(subAddress);	                 // Put slave register address in Tx buffer
+	//ui8_return = i2c_write(subAddress);
+  	UART_Printf("SubAddress to send is %x\n\r" , subAddress);
+
+	//Wire.endTransmission(false);             // Send the Tx buffer, but send a restart to keep connection alive
+	//ui8_return = i2c_rep_start(address + I2C_READ);
+	ui8_return = twi_writeTo(address , &subAddress , 1 , 1 ,(uint8_t) false); // Send to address content of *subAddress 
+									 //with length 1 , wait for end of transmit and 
+									 //don't send a stop-condition	
+	if(ui8_return == 0)
+	{
+  		UART_Printf("Send subAddress %x to address %x\n\r" , subAddress , address);
+	}
+	else if(ui8_return == 2)
+	{	
+  		UART_Printf("Address was send received a NACK!\n\r");
+	}
+	else if(ui8_return == 3)
+	{
+  		UART_Printf("subAddress was send received a NACK!\n\r");
+	}
+	else
+	{
+		UART_Printf("ERROR! Status-Code: %x!\n\r" , ui8_return);
+	}
+        //Wire.requestFrom(address, count);  // Read bytes from slave register address 
+	ui8_return = twi_readFrom(address, destinationBuffer, byteCount, (uint8_t)true); //Read byteCount-Bytes from 
+											 //address an put it into the
+											 //destinationBuffer then send a
+											 //stop-condition
+	if(ui8_return != byteCount)
+	{
+		UART_Printf("Whoopsie read 0x%x Bytes instead of 0x%x Byte...\n\r" , ui8_return , byteCount);
+	}
+	//while (Wire.available()) {
+        //dest[i++] = Wire.read(); }         // Put read results in the Rx buffer <-- We don't need this because we let
+	//					TWI Write directly into the memory region because we dont use a 
+	//					system buffer
+
+	//i2c_stop();	//Free the bus for other operations <- This happens automatically at the end of twi_readFrom
+	//		  				       because of the "true" as last parameter
+  	UART_Printf("End of readBytes()\n\r");
+}
+
+
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 

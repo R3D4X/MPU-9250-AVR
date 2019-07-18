@@ -39,7 +39,7 @@
 
 #include "mpu9250_registers.h"
 #include "uart.h"
-#include "i2cmaster.h"
+#include "twi.h"
 
 // Using NOKIA 5110 monochrome 84 x 48 pixel display
 // pin 9 - Serial clock out (SCLK)
@@ -60,7 +60,7 @@
 #endif  
 
 #define AHRS true         // set to false for basic data read
-#define SerialDebug true   // set to true to get Serial output for debugging
+//#define SerialDebug true   // set to true to get Serial output for debugging
 
 // global constants for 9 DoF fusion and AHRS (Attitude and Heading Reference System)
 #define GyroMeasError  M_PI * (40.0f / 180.0f);   // gyroscope measurement error in rads/s (start at 40 deg/s)
@@ -106,6 +106,10 @@ void mpu9250_setup(void);
 void writeByte(uint8_t address, uint8_t subAddress, uint8_t data);
 uint8_t readByte(uint8_t address, uint8_t subAddress);
 void readBytes(uint8_t address, uint8_t subAddress, uint8_t count, uint8_t * dest);
+
+uint8_t readByte_Debug(uint8_t address, uint8_t subAddress);
+void readBytes_Debug(uint8_t address, uint8_t subAddress, uint8_t count, uint8_t * dest);
+
 void magcalMPU9250(float * dest1, float * dest2);
 void getMres(void);
 void getGres(void);

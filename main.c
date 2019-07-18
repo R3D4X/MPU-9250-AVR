@@ -1,13 +1,16 @@
 //#include <Wire.h>
 #include <avr/io.h>
+#include <avr/interrupt.h>
 
-#include "i2cmaster.h"
+#include "twi.h"
 #include "mpu9250.h"
 #include "uart.h"
 #include "millis.h"
 
 #ifndef main_declarations
 #define main_declarations
+
+//#define SerialDebug
 
 int16_t accelCount[3];  // Stores the 16-bit signed accelerometer sensor output
 int16_t gyroCount[3];   // Stores the 16-bit signed gyro sensor output
@@ -17,9 +20,9 @@ float ax, ay, az, gx, gy, gz, mx, my, mz; // variables to hold latest sensor dat
 float q[4] = {1.0f, 0.0f, 0.0f, 0.0f};    // vector to hold quaternion
 float eInt[3] = {0.0f, 0.0f, 0.0f};       // vector to hold integral error for Mahony method
 
-uint32_t lastUpdate = 0;	// used to calculate integration interval
+unsigned long lastUpdate = 0;	// used to calculate integration interval
 unsigned long Now = 0;	// used to calculate integration interval
-float pitch = 0, yaw = 0, roll = 0;
+double pitch = 0, yaw = 0, roll = 0;
 uint32_t delt_t = 0; // used to control display output rate
 uint32_t count = 0, sumCount = 0; // used to control display output rate
 
@@ -28,12 +31,21 @@ uint32_t count = 0, sumCount = 0; // used to control display output rate
 //void setup()
 int main(void)
 {
-	//Wire.begin();
-    	i2c_init();                                // init I2C interface
-  	//Serial.begin(115200);
+	sei();
+
+	millis_init();
+
+	//Serial.begin(115200);
 	UART_Init(115200);
 
-  	mpu9250_setup();
+	//Wire.begin();
+    	twi_init();                                // init TWI interface
+  
+  	UART_Printf("Frequency %U\n\r" , F_CPU);
+  	
+	mpu9250_setup();
+  	
+	UART_Printf("Setup done! Purchasing gyroscopical data...\n\r");
 
 	//void loop()
 	while(1)
@@ -48,6 +60,9 @@ int main(void)
     			ax = (float)accelCount[0]*aRes; // - accelBias[0];  // get actual g value, this depends on scale being set
     			ay = (float)accelCount[1]*aRes; // - accelBias[1];   
     			az = (float)accelCount[2]*aRes; // - accelBias[2];  
+  			//UART_Printf("ax: %f\n\r" , ax);
+  			//UART_Printf("ay: %f\n\r" , ay);
+  			//UART_Printf("az: %f\n\r" , az);
    
     			readGyroData(gyroCount);  // Read the x/y/z adc values
     			getGres();
@@ -56,7 +71,10 @@ int main(void)
     			gx = (float)gyroCount[0]*gRes;  // get actual gyro value, this depends on scale being set
     			gy = (float)gyroCount[1]*gRes;  
     			gz = (float)gyroCount[2]*gRes;   
-  
+   			//UART_Printf("gx: %f\n\r" , gx);
+  			//UART_Printf("gy: %f\n\r" , gy);
+  			//UART_Printf("gz: %f\n\r" , gz);
+ 
     			readMagData(magCount);  // Read the x/y/z adc values
     			getMres();
 //    			magbias[0] = +470.;  // User environmental x-axis correction in milliGauss, should be automatically calculated
@@ -68,10 +86,16 @@ int main(void)
     			mx = (float)magCount[0]*mRes*magCalibration[0] - magBias[0];  // get actual magnetometer value, this depends on scale being set
     			my = (float)magCount[1]*mRes*magCalibration[1] - magBias[1];  
     			mz = (float)magCount[2]*mRes*magCalibration[2] - magBias[2];   
+			//UART_Printf("mx: %f\n\r" , mx);
+  			//UART_Printf("my: %f\n\r" , my);
+  			//UART_Printf("mz: %f\n\r" , mz);
+
   		}
   
   		Now = micros_get();
   		deltat = ((Now - lastUpdate)/1000000.0f); // set integration time by time elapsed since last filter update
+  		//UART_Printf("dt =: %U us\n\r" , deltat);
+  		//UART_Printf("Now: %U Then %U\n\r" , Now , lastUpdate);
   		lastUpdate = Now;
 
   		sum += deltat; // sum for averaging filter update rate
@@ -93,28 +117,28 @@ int main(void)
     			delt_t = millis() - count;
     			if(delt_t > 500) 
 			{
-    				if(SerialDebug) 
-				{
+#ifdef SerialDebug
+
     				// Print acceleration values in milligs!
-//    					UART_Printf("X-acceleration: "); UART_Printf(1000*ax); UART_Printf(" mg ");
-//    					UART_Printf("Y-acceleration: "); UART_Printf(1000*ay); UART_Printf(" mg ");
-//    					UART_Printf("Z-acceleration: "); UART_Printf(1000*az); UART_Printf(" mg "); UART_Printf("\n");
-// 
-//    				// Print gyro values in degree/sec
-//    					UART_Printf("X-gyro rate: "); UART_Printf(gx, 3); UART_Printf(" degrees/sec "); 
-//    					UART_Printf("Y-gyro rate: "); UART_Printf(gy, 3); UART_Printf(" degrees/sec "); 
-//    					UART_Printf("Z-gyro rate: "); UART_Printf(gz, 3); UART_Printf(" degrees/sec"); UART_Printf("\n");
-//    
-//    				// Print mag values in degree/sec
-//    					UART_Printf("X-mag field: "); UART_Printf(mx); UART_Printf(" mG "); 
-//    					UART_Printf("Y-mag field: "); UART_Printf(my); UART_Printf(" mG "); 
-//    					UART_Printf("Z-mag field: "); UART_Printf(mz); UART_Printf(" mG"); UART_Printf("\n");
+    					UART_Printf("X-acceleration: %f mm/s²\t"   , 1000*ax);
+    					UART_Printf("Y-acceleration: %f mm/s²\t"   , 1000*ay);
+    					UART_Printf("Z-acceleration: %f mm/s²\n\r" , 1000*az);
+ 
+    				// Print gyro values in degree/sec
+    					UART_Printf("X-gyro rate: %f °/s \t"  , gx); 
+    					UART_Printf("Y-gyro rate: %f °/s \t"  , gy); 
+    					UART_Printf("Z-gyro rate: %f °/s\n\r" , gz);
+    
+    				// Print mag values in degree/sec
+    					UART_Printf("X-mag field: %f mG \t" , mx);
+    					UART_Printf("Y-mag field: %f mG \t" , my);
+    					UART_Printf("Z-mag field: %f mG \t" , mz);
  
     					tempCount = readTempData();  // Read the adc values
     					temperature = ((float) tempCount) / 333.87 + 21.0; // Temperature in degrees Centigrade
    				// Print temperature in degrees Centigrade      
-    					UART_Printf("Temperature is %d in °/C\n",temperature, 1);
-    				}
+    					UART_Printf("Temperature is %f in °/C\n",temperature);
+#endif
     
     				count = millis();
   				PORTB ^= (1 << 5);
@@ -129,23 +153,27 @@ int main(void)
     			if (delt_t > 50) 
 			{ // update LCD once per half-second independent of read rate
 
-    				if(SerialDebug) 
-				{
-//    					UART_Printf("ax = "); UART_Printf((int)1000*ax);  
-//    					UART_Printf(" ay = "); UART_Printf((int)1000*ay); 
-//    					UART_Printf(" az = "); UART_Printf((int)1000*az); UART_Printfln(" mg");
-//    					UART_Printf("gx = "); UART_Printf( gx, 2); 
-//    					UART_Printf(" gy = "); UART_Printf( gy, 2); 
-//    					UART_Printf(" gz = "); UART_Printf( gz, 2); UART_Printfln(" deg/s");
-//    					UART_Printf("mx = "); UART_Printf( (int)mx ); 
-//    					UART_Printf(" my = "); UART_Printf( (int)my ); 
-//    					UART_Printf(" mz = "); UART_Printf( (int)mz ); UART_Printfln(" mG");
-//    	
-//    					UART_Printf("q0 = "); UART_Printf(q[0]);
-//   	 				UART_Printf(" qx = "); UART_Printf(q[1]); 
-//   	 				UART_Printf(" qy = "); UART_Printf(q[2]); 
-//   	 				UART_Printf(" qz = "); UART_Printfln(q[3]); 
-    				}               
+#ifdef SerialDebug
+    				// Print acceleration values in milligs!
+    					UART_Printf("X-acceleration: %f mm/s²\t"   , 1000*ax);
+    					UART_Printf("Y-acceleration: %f mm/s²\t"   , 1000*ay);
+    					UART_Printf("Z-acceleration: %f mm/s²\n\r" , 1000*az);
+ 
+    				// Print gyro values in degree/sec
+    					UART_Printf("X-gyro rate: %f °/s \t"  , gx); 
+    					UART_Printf("Y-gyro rate: %f °/s \t"  , gy); 
+    					UART_Printf("Z-gyro rate: %f °/s\n\r" , gz);
+    
+    				// Print mag values in degree/sec
+    					UART_Printf("X-mag field: %f mG \t" , mx);
+    					UART_Printf("Y-mag field: %f mG \t" , my);
+    					UART_Printf("Z-mag field: %f mG \t" , mz);
+ 
+    					UART_Printf("q0 = %f \t"   , q[0]);
+   	 				UART_Printf("qx = %f \t"   , q[1]); 
+   	 				UART_Printf("qy = %f \t"   , q[2]); 
+   	 				UART_Printf("qz = %f \n\r" , q[3]); 
+#endif
     
   				// Define output variables from updated quaternion---these are Tait-Bryan angles, commonly used in aircraft orientation.
   				// In this coordinate system, the positive z-axis is down toward Earth. 
@@ -156,7 +184,8 @@ int main(void)
   				// Tait-Bryan angles as well as Euler angles are non-commutative; that is, the get the correct orientation the rotations must be
   				// applied in the correct order which for this configuration is yaw, pitch, and then roll.
   				// For more see http://en.wikipedia.org/wiki/Conversion_between_quaternions_and_Euler_angles which has additional links.
-  	  			yaw   = atan2(2.0f * (q[1] * q[2] + q[0] * q[3]), q[0] * q[0] + q[1] * q[1] - q[2] * q[2] - q[3] * q[3]);   
+
+  	  			yaw   = atan2(2.0f * (q[1] * q[2] + q[0] * q[3]), q[0] * q[0] + q[1] * q[1] - q[2] * q[2] - q[3] * q[3]);
   	  			pitch = -asin(2.0f * (q[1] * q[3] - q[0] * q[2]));
   	  			roll  = atan2(2.0f * (q[0] * q[1] + q[2] * q[3]), q[0] * q[0] - q[1] * q[1] - q[2] * q[2] + q[3] * q[3]);
   	  			pitch *= 180.0f / M_PI;
@@ -164,8 +193,7 @@ int main(void)
     				yaw   -= 2.45; /* 2019-03-30	2° 45' E  changing by  0.083° E per year (+ve for west )*/
     				roll  *= 180.0f / M_PI;
      
-
-    				UART_Printf("Yaw, Pitch, Roll: %d , %d , %d\n" , yaw+180, pitch, roll);
+    				UART_Printf("Yaw, Pitch, Roll: %f , %f , %f\n\r" , yaw+180.0f , pitch, roll);
     
   	  			// With these settings the filter is updating at a ~145 Hz rate using the Madgwick scheme and 
   	  			// >200 Hz using the Mahony scheme even though the display refreshes at only 2 Hz.

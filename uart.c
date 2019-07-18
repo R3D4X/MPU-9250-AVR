@@ -346,9 +346,14 @@ void UART_TxNumber(uint8_t v_numericSystem_u8, uint32_t v_number_u32, uint8_t v_
 #if (Enable_UART_TxFloatNumber==1)
 void UART_TxFloatNumber(float v_floatNumber_f32)
 {
+	if(v_floatNumber_f32 < 0)
+	{
+		UART_TxChar('-');
+		v_floatNumber_f32 *= -1.00f;
+	}
 	uint32_t v_tempNumber_u32;
 	/* Dirty hack to support the floating point by extracting the integer and fractional part.
-      1.Type cast the number to int to get the integer part.
+      	1.Type cast the number to int to get the integer part.
 	  2.transmit the extracted integer part followed by a decimal point(.).
 	  3.Later the integer part is made zero by subtracting with the extracted integer value.
 	  4.Finally the fractional part is multiplied by 100000 to support 6-digit precision */
